@@ -1,3 +1,9 @@
+
+export PYTHONPATH=../../lib; python reddit_saves_parser.py
+
+
+
+
 Evernote SDK for Python
 ============================================
 
@@ -30,7 +36,8 @@ The code in `sample/client/EDAMTest.py` demonstrates the basics of using the Eve
 3. On the command line, run the following command to execute the script:
 
     ```bash
-    $ export PYTHONPATH=../../lib; python EDAMTest.py
+    $ 
+    
     ```
 
 Getting Started - Django with OAuth
