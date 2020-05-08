@@ -1,7 +1,18 @@
 
 export PYTHONPATH=../../lib; python reddit_saves_parser.py
 
-
+https://dev.evernote.com/doc/articles/resources.php#creating
+https://dev.evernote.com/doc/articles/creating_notes.php
+https://stackoverflow.com/questions/7391945/how-do-i-read-image-data-from-a-url-in-python
+https://dev.evernote.com/doc/articles/enml.php
+https://dev.evernote.com/doc/reference/Types.html#Struct_Note
+https://dev.evernote.com/doc/articles/rate_limits.php
+https://dev.evernote.com/doc/reference/javadoc/com/evernote/edam/error/EDAMUserException.html
+https://dev.evernote.com/doc/reference/Errors.html
+https://dev.evernote.com/doc/articles/rate_limits.php
+https://docs.python.org/3/tutorial/errors.html
+https://dev.evernote.com/doc/reference/
+https://github.com/evernote/evernote-sdk-python/pull/43/files
 
 
 Evernote SDK for Python

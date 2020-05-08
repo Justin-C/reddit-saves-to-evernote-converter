@@ -7,13 +7,14 @@
 # To run (Unix):
 #   export PYTHONPATH=../../lib; python EDAMTest.py
 #
-
+# -*- coding: utf-8 -*-
 import hashlib
 import binascii
 import evernote.edam.userstore.constants as UserStoreConstants
 import evernote.edam.type.ttypes as Types
 
 from evernote.api.client import EvernoteClient
+import evernote.edam.error.ttypes as Errors
 
 import requests
 from requests.exceptions import HTTPError
@@ -22,6 +23,11 @@ from io import BytesIO
 import urllib2, cStringIO
 from urllib2 import urlopen
 import base64
+import random
+import time
+from datetime import datetime
+
+
 
 
 
@@ -40,7 +46,7 @@ import base64
 # refer to https://dev.evernote.com/doc/articles/testing.php 
 # and https://dev.evernote.com/doc/articles/bootstrap.php
 
-auth_token = "your devloper token"
+auth_token = "you developer token"
 
 if auth_token == "your developer token":
     print "Please fill in your developer token"
@@ -64,7 +70,7 @@ client = EvernoteClient(token=auth_token, sandbox=sandbox, china=china)
 user_store = client.get_user_store()
 
 version_ok = user_store.checkVersion(
-    "Evernote EDAMTest (Python)",
+    "Evernote reddit_saves_parser: converts list of reddit links to evernote notes (Python)",
     UserStoreConstants.EDAM_VERSION_MAJOR,
     UserStoreConstants.EDAM_VERSION_MINOR
 )
@@ -75,39 +81,11 @@ if not version_ok:
 
 note_store = client.get_note_store()
 
-# List all of the notebooks in the user's account
-notebooks = note_store.listNotebooks()
-print "Found ", len(notebooks), " notebooks:"
-for notebook in notebooks:
-    print "  * ", notebook.name
-
 print
-print "Creating a new note in the default notebook"
+print "Creating a new note"
 print
 
-
-with open("ALL REDDIT SAVES.txt", "r") as f:
-    fileList = list(f.readlines())
-    print len(fileList)
-
-    # parse out dud reddit links (generic url or subreddit)
-    with open('./generics removed.txt', 'w') as f2:
-        with open('./generics clean.txt', 'w') as f3:
-
-            for link in fileList:
-                if "reddit" in link and len(link.split('/'))<=6:
-                    f2.write(link)
-                else:
-                    f3.write(link)
-
-with open("./generics clean.txt", "r") as f4:
-    with open("./generics clean extracted comments.txt", "w") as f5:
-        genList = list(f4.readlines())
-        for link2 in range(0, len(genList)):
-            # if it's a comment link
-            if "reddit" in genList[link2] and len(genList[link2].split('/'))==10:
-                f5.write(genList[link2])
-                
+errors=[]            
 posts=[]
 comments=[]
 with open("ALL REDDIT SAVES.txt", "r") as f6:
@@ -117,13 +95,13 @@ with open("ALL REDDIT SAVES.txt", "r") as f6:
     for link3 in fileList2:
         if "reddit" in link3 and len(link3.split('/'))==9:
             posts.append(link3)
-        elif "reddit" in link and len(link3.split('/'))==10:
+        elif "reddit" in link3 and len(link3.split('/'))==10:
             posts.pop()
             comments.append(link3)
     print len(posts)
     print len(comments)
 
-for p in range(0, 5):
+for p,t in enumerate(posts):
     try:
         req = requests.get('https://api.reddit.com/api/info/?id=t3_'+posts[p].split('/')[6], headers = {'User-agent': 'redditEvernoteBot'})
 
@@ -131,71 +109,58 @@ for p in range(0, 5):
         req.raise_for_status()
     except HTTPError as http_err:
         print(http_err)  # Python 3.6
+        errors.append(posts[p])
     except Exception as err:
         print(err)  # Python 3.6
+        errors.append(posts[p])
     else:
-        print('Success!')
-        # comment body
+        print(str(p)+'/'+str(len(posts))+' Success! '+posts[p])
         reqData=req.json()
         note = Types.Note()
-        note.title = reqData['data']['children'][0]['data']['title']
-        note.tagNames=[reqData['data']['children'][0]['data']['subreddit'], 'reddit', 'reddit_saves_bot']
+        try:
+            note.tagNames=[reqData['data']['children'][0]['data']['subreddit'], 'reddit', 'reddit_saves_bot']
+        except:
+            print 'non standard format, skipping'
+            errors.append(posts[p])
+            continue
         selftext=reqData['data']['children'][0]['data']['selftext'] or None
         cUrl=reqData['data']['children'][0]['data']['url']
         contentUrl=cUrl if ("reddit" not in cUrl) else None
         thumbnailUrl=reqData['data']['children'][0]['data']['thumbnail'] or None
         postUrl='https://reddit.com'+reqData['data']['children'][0]['data']['permalink']
+        postDate=datetime.utcfromtimestamp(reqData['data']['children'][0]['data']['created_utc']).strftime('%Y-%m-%d')
+        postTitle=(reqData['data']['children'][0]['data']['title'])
+        note.title= u' '.join([postDate, postTitle[:100]]).encode('ascii', 'ignore').decode('ascii').replace('\n', "").strip()
 
+        image=None
+        # Thumbnail can be image url or 'self', 'spoiler', 'default', etc
+        if (thumbnailUrl is not None) and (thumbnailUrl[:4] == 'http'):
+            try:
+                image = urllib2.urlopen(thumbnailUrl).read()
+            except:
+                image=None
 
-        # To include an attachment such as an image in a note, first create a Resource
-        # for the attachment. At a minimum, the Resource contains the binary attachment
-        # data, an MD5 hash of the binary data, and the attachment MIME type.
-        # It can also include attributes such as filename and location.
-        print thumbnailUrl
-        if (thumbnailUrl is not None) and (not thumbnailUrl == 'self') and (not thumbnailUrl == 'spoiler'):
+        if image is not None:
+            md5 = hashlib.md5()
+            md5.update(image)
+            hash = md5.digest()
 
-            # thumbnailReq=requests.get(thumbnailUrl)
-            # image = Image.open(BytesIO(thumbnailReq.content))
-            # image = Image.open(thumbnailReq.raw)
+            data = Types.Data()
+            data.size = len(image)
+            data.bodyHash = hash
+            data.body = image
 
-            # file3 = cStringIO.StringIO(urllib2.urlopen(thumbnailUrl).read())
-            # image = Image.open(file3).tobytes()
-            # x=urllib2.urlopen(thumbnailUrl)
-            # with x as url:
-            #     with open('temp.jpg', 'wb') as f:
-            #         f.write(url.read())
+            resource = Types.Resource()
+            resource.mime = 'image/png'
+            resource.data = data
 
-            # image = Image.open('temp.jpg')
-            image = urllib2.urlopen(thumbnailUrl).read()
+            # Now, add the new Resource to the note's list of resources
+            note.resources = [resource]
 
-            # image = base64.b64encode(contents)
-            # print image
-
-
-        else:
-            image = open('enlogo.png', 'rb').read()
-
-
-        md5 = hashlib.md5()
-        md5.update(image)
-        hash = md5.digest()
-
-        data = Types.Data()
-        data.size = len(image)
-        data.bodyHash = hash
-        data.body = image
-
-        resource = Types.Resource()
-        resource.mime = 'image/png'
-        resource.data = data
-
-        # Now, add the new Resource to the note's list of resources
-        note.resources = [resource]
-
-        # To display the Resource as part of the note's content, include an <en-media>
-        # tag in the note's ENML content. The en-media tag identifies the corresponding
-        # Resource using the MD5 hash.
-        hash_hex = binascii.hexlify(hash)
+            # To display the Resource as part of the note's content, include an <en-media>
+            # tag in the note's ENML content. The en-media tag identifies the corresponding
+            # Resource using the MD5 hash.
+            hash_hex = binascii.hexlify(hash)
 
         # The content of an Evernote note is represented using Evernote Markup Language
         # (ENML). The full ENML specification can be found in the Evernote API Overview
@@ -205,16 +170,35 @@ for p in range(0, 5):
             '"http://xml.evernote.com/pub/enml2.dtd">'
         note.content += '<en-note><br/>'
         if selftext is not None:
-            note.content += '<h5>'+selftext+'YERTTTT'+'</h5><br/>'
+            note.content += '<h5>'+selftext+'</h5><br/>'
         if contentUrl is not None:
             note.content += '<a href="'+contentUrl+'">'+contentUrl+'</a><br/>'
         note.content += '<a href="'+postUrl+'">'+postUrl+'</a><br/>'
-        note.content += '<en-media width="300" height="225" type="image/png" hash="' + hash_hex + '"/>'
+        if image is not None: 
+            note.content += '<en-media width="300" height="225" type="image/png" hash="' + hash_hex + '"/>'
         note.content += '</en-note>'
 
         # Finally, send the new note to Evernote using the createNote method
         # The new Note object that is returned will contain server-generated
         # attributes such as the new note's unique GUID.
-        created_note = note_store.createNote(note)
+        try:
+            created_note = note_store.createNote(note)
+        except Errors.EDAMSystemException, e:
+            if e.errorCode == Errors.EDAMErrorCode.RATE_LIMIT_REACHED:
+                print "Rate limit reached"
+                print "Retry your request in %d seconds" % e.rateLimitDuration
+                time.sleep(e.rateLimitDuration+1)
+                try:
+                    created_note = note_store.createNote(note)
+                except:
+                    print 'failed'
+                    errors.append(posts[p])
+                    continue
+                    
+                
 
+    
+    # wait a random amnt of time
+    time.sleep(random.randint(1,3))
 
+print 'Done! Errors: '+str(len(errors))+ ' '+str(errors) 
