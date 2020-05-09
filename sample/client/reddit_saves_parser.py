@@ -46,7 +46,7 @@ from datetime import datetime
 # refer to https://dev.evernote.com/doc/articles/testing.php 
 # and https://dev.evernote.com/doc/articles/bootstrap.php
 
-auth_token = "you developer token"
+auth_token = "your developer token"
 
 if auth_token == "your developer token":
     print "Please fill in your developer token"
@@ -92,11 +92,13 @@ with open("ALL REDDIT SAVES.txt", "r") as f6:
     fileList2 = list(f6.readlines())
     print len(fileList2)
 
-    for link3 in fileList2:
+    for idx,link3 in enumerate(fileList2):
+        print link3
         if "reddit" in link3 and len(link3.split('/'))==9:
             posts.append(link3)
         elif "reddit" in link3 and len(link3.split('/'))==10:
-            posts.pop()
+            if len(posts)>0 and idx>0 and (len(comments)==0 or (not (link3.split('/')[:7] == comments[-1].split('/')[:7])) ) :
+                posts.pop()
             comments.append(link3)
     print len(posts)
     print len(comments)
@@ -202,3 +204,5 @@ for p,t in enumerate(posts):
     time.sleep(random.randint(1,3))
 
 print 'Done! Errors: '+str(len(errors))+ ' '+str(errors) 
+print (len(comments))
+print (len(posts))
